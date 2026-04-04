@@ -1,0 +1,29 @@
+{
+  "name": "prod-issue_assigner",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yashasvisharma-iet/Prod-Issue_Assigner.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/yashasvisharma-iet/Prod-Issue_Assigner/issues"
+  },
+  "homepage": "https://github.com/yashasvisharma-iet/Prod-Issue_Assigner#readme",
+  "dependencies": {
+    "@prisma/client": "^7.6.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.2",
+    "express": "^5.2.1",
+    "prisma": "^7.6.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^6.0.2"
+  }
+}
