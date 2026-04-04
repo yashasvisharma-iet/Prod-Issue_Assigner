@@ -1,17 +1,25 @@
 import { buildIdempotencyKey } from '../lib/signature.js';
 
+function requiredIssueId(source, value) {
+  if (value === undefined || value === null || value === '') {
+    throw new Error(`Cannot normalize ${source} event without issue identifier`);
+  }
+  return String(value);
+}
+
 export function normalizeGithubIssueEvent(headers, payload) {
   const externalEventId = headers['x-github-delivery'];
   const eventType = headers['x-github-event'] || 'issues';
   const action = payload.action;
   const issue = payload.issue || {};
+  const externalIssueId = requiredIssueId('github', issue.id || issue.number);
 
   return {
     source: 'github',
     externalEventId,
     eventType,
     action,
-    externalIssueId: String(issue.id || issue.number || ''),
+    externalIssueId,
     title: issue.title || 'Untitled GitHub Issue',
     description: issue.body || null,
     status: issue.state || null,
@@ -22,7 +30,7 @@ export function normalizeGithubIssueEvent(headers, payload) {
       source: 'github',
       externalEventId,
       action,
-      issueId: issue.id || issue.number
+      issueId: externalIssueId
     })
   };
 }
@@ -33,13 +41,14 @@ export function normalizeJiraIssueEvent(headers, payload) {
   const action = payload.issue_event_type_name || payload.webhookEvent || 'updated';
   const issue = payload.issue || {};
   const fields = issue.fields || {};
+  const externalIssueId = requiredIssueId('jira', issue.id || issue.key);
 
   return {
     source: 'jira',
     externalEventId,
     eventType,
     action,
-    externalIssueId: String(issue.id || issue.key || ''),
+    externalIssueId,
     title: fields.summary || 'Untitled Jira Issue',
     description: fields.description || null,
     status: fields.status?.name || null,
@@ -50,7 +59,7 @@ export function normalizeJiraIssueEvent(headers, payload) {
       source: 'jira',
       externalEventId,
       action,
-      issueId: issue.id || issue.key
+      issueId: externalIssueId
     })
   };
 }

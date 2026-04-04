@@ -7,18 +7,20 @@ Node.js + Express + PostgreSQL + Prisma + Kafka implementation of the server fou
 - Webhook ingestion endpoints:
   - `POST /webhook/github/issues`
   - `POST /webhook/jira/issues`
-- Signature verification for GitHub/Jira webhooks
+- Signature verification for GitHub/Jira webhooks (with safe constant-time comparison)
 - Canonical event normalization
 - Idempotent webhook event persistence (`WebhookEvent` table)
 - Kafka producer for decoupled processing
 - Kafka consumer worker for issue upsert + placeholder assignment
+- Failed queue publish / processing state persisted to DB for observability
+- Graceful shutdown hooks for API and worker
 - PostgreSQL schema via Prisma for developers, issues, assignments, webhook events
 
 ## Project structure
 
 - `src/server.js` - Express server + webhook route mounting
 - `src/routes/webhooks.js` - Webhook handlers for GitHub/Jira
-- `src/services/normalizer.js` - Provider payload normalization
+- `src/services/normalizer.js` - Provider payload normalization + required field checks
 - `src/services/assignment.js` - Placeholder assignment logic (lowest-load available)
 - `src/worker.js` - Kafka consumer worker
 - `src/lib/signature.js` - HMAC signature verification + idempotency key creation
