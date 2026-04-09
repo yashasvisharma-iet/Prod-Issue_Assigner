@@ -6,25 +6,15 @@ const { AssignmentJob } = require("./webhookDto");
 class WebhookService {
   constructor({
     githubWebhookSecret = process.env.GITHUB_WEBHOOK_SECRET,
-    jiraWebhookToken = process.env.JIRA_WEBHOOK_TOKEN,
     queueConsumer,
   } = {}) {
     this.githubWebhookSecret = githubWebhookSecret;
-    this.jiraWebhookToken = jiraWebhookToken;
     this.queueConsumer = queueConsumer;
     this.queue = [];
   }
 
   validateSignature({ source, headers = {}, rawBody = "" }) {
-    if (source === "github") {
-      return this.validateGithubSignature(headers, rawBody);
-    }
-
-    if (source === "jira") {
-      return this.validateJiraToken(headers);
-    }
-
-    return false;
+    return source === "github" && this.validateGithubSignature(headers, rawBody);
   }
 
   validateGithubSignature(headers, rawBody) {
@@ -43,20 +33,6 @@ class WebhookService {
       .digest("hex")}`;
 
     return this.safeCompare(signature, digest);
-  }
-
-  validateJiraToken(headers) {
-    if (!this.jiraWebhookToken) {
-      // Fallback mode for local development if token is not configured.
-      return true;
-    }
-
-    const token = headers["x-jira-webhook-token"] || headers.authorization?.replace(/^Bearer\s+/i, "");
-    if (!token) {
-      return false;
-    }
-
-    return this.safeCompare(token, this.jiraWebhookToken);
   }
 
   enqueue(issueEvent) {
