@@ -35,9 +35,7 @@ class NormalizedIssueEvent {
   }
 }
 
-/**
- * Queue payload for phase-1 processing pipeline.
- */
+
 class AssignmentJob {
   constructor({ id, receivedAt, issueEvent }) {
     this.id = id;

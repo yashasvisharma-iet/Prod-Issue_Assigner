@@ -3,22 +3,6 @@
 const { NormalizedIssueEvent } = require("./webhookDto");
 
 class WebhookParser {
-  detectSource(headers = {}, payload = {}) {
-    if (headers["x-github-event"] || payload.repository?.full_name) {
-      return "github";
-    }
-    return "unknown";
-  }
-
-  parse(headers = {}, payload = {}) {
-    const source = this.detectSource(headers, payload);
-
-    if (source === "github") {
-      return this.parseGithub(headers, payload);
-    }
-
-    throw new Error("Unsupported webhook source; only GitHub issue webhooks are accepted");
-  }
 
   parseGithub(headers, payload) {
     const issue = payload.issue;
