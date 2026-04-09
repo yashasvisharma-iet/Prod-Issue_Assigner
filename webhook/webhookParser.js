@@ -7,9 +7,6 @@ class WebhookParser {
     if (headers["x-github-event"] || payload.repository?.full_name) {
       return "github";
     }
-    if (headers["x-atlassian-webhook-identifier"] || payload.issue?.key) {
-      return "jira";
-    }
     return "unknown";
   }
 
@@ -20,11 +17,7 @@ class WebhookParser {
       return this.parseGithub(headers, payload);
     }
 
-    if (source === "jira") {
-      return this.parseJira(headers, payload);
-    }
-
-    throw new Error("Unsupported webhook source");
+    throw new Error("Unsupported webhook source; only GitHub issue webhooks are accepted");
   }
 
   parseGithub(headers, payload) {
@@ -50,30 +43,6 @@ class WebhookParser {
     });
   }
 
-  parseJira(headers, payload) {
-    const issue = payload.issue;
-    if (!issue) {
-      throw new Error("Jira payload missing issue object");
-    }
-
-    const fields = issue.fields || {};
-
-    return new NormalizedIssueEvent({
-      source: "jira",
-      eventType: payload.webhookEvent || headers["x-atlassian-webhook-identifier"] || "jira:issue_created",
-      deliveryId: headers["x-request-id"] || headers["x-atlassian-webhook-identifier"],
-      issueId: String(issue.id),
-      issueKey: issue.key,
-      title: fields.summary,
-      body: fields.description || "",
-      labels: fields.labels || [],
-      assignee: fields.assignee?.displayName || null,
-      reporter: fields.reporter?.displayName || null,
-      createdAt: fields.created,
-      updatedAt: fields.updated,
-      raw: payload,
-    });
-  }
 }
 
 module.exports = {
