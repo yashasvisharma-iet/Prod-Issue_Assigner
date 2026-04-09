@@ -1,22 +1,7 @@
 "use strict";
 
-const http = require("http");
+const express = require("express");
 const { createWebhookController } = require("./webhookController");
-
-function createResponseAdapter(res) {
-  return {
-    status(code) {
-      res.statusCode = code;
-      return this;
-    },
-    json(payload) {
-      if (!res.headersSent) {
-        res.setHeader("content-type", "application/json; charset=utf-8");
-      }
-      res.end(JSON.stringify(payload));
-    },
-  };
-}
 
 function parseJsonBody(body) {
   if (!body) {
@@ -36,42 +21,39 @@ function startWebhookServer({
   controller = createWebhookController(),
   logger = console,
 } = {}) {
-  const server = http.createServer(async (req, res) => {
-    if (req.url === "/healthz") {
-      return createResponseAdapter(res).status(200).json({ status: "ok" });
-    }
+  const app = express();
 
-    if (req.url !== "/webhook/issues") {
-      return createResponseAdapter(res).status(404).json({ error: "Not found" });
-    }
-
-    const chunks = [];
-    req.on("data", (chunk) => chunks.push(chunk));
-    req.on("error", () => createResponseAdapter(res).status(400).json({ error: "Invalid request body" }));
-    req.on("end", async () => {
-      const rawBody = Buffer.concat(chunks).toString("utf8");
-      const body = parseJsonBody(rawBody);
-      if (body === null) {
-        return createResponseAdapter(res).status(400).json({ error: "Invalid JSON body" });
-      }
-
-      const adaptedReq = {
-        method: req.method,
-        headers: req.headers,
-        body,
-        rawBody,
-      };
-
-      try {
-        await controller(adaptedReq, createResponseAdapter(res));
-      } catch (error) {
-        logger.error("Unhandled webhook handler error", { error: error.message });
-        createResponseAdapter(res).status(500).json({ error: "Internal server error" });
-      }
-    });
+  app.get("/healthz", (_req, res) => {
+    res.status(200).json({ status: "ok" });
   });
 
-  server.listen(port, host, () => {
+  app.all("/webhook/issues", express.text({ type: "*/*" }), async (req, res) => {
+    const rawBody = typeof req.body === "string" ? req.body : "";
+    const body = parseJsonBody(rawBody);
+    if (body === null) {
+      return res.status(400).json({ error: "Invalid JSON body" });
+    }
+
+    const adaptedReq = {
+      method: req.method,
+      headers: req.headers,
+      body,
+      rawBody,
+    };
+
+    try {
+      await controller(adaptedReq, res);
+    } catch (error) {
+      logger.error("Unhandled webhook handler error", { error: error.message });
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.use((_req, res) => {
+    res.status(404).json({ error: "Not found" });
+  });
+
+  const server = app.listen(port, host, () => {
     logger.info(`Webhook server listening on http://${host}:${port}`);
   });
 
