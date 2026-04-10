@@ -60,6 +60,7 @@ async function handleIssueCreatedEvent(message) {
     return;
   }
 
+  await upsertIssueFromEvent(issue);
   const result = await engine.assignIssue(issue, { method: 'rule' });
 
   console.log('Issue assignment processed', {
@@ -90,3 +91,39 @@ start().catch((error) => {
   console.error('Issue processor crashed', error);
   process.exit(1);
 });
+
+async function upsertIssueFromEvent(issue = {}) {
+  if (!cachedPgClient) {
+    throw new Error('Database client is not initialized');
+  }
+
+  const issueId = issue.issueId || issue.id;
+  if (!issueId) {
+    throw new Error('Issue payload is missing issueId');
+  }
+
+  await cachedPgClient.query(
+    `INSERT INTO issues (
+      id,
+      title,
+      description,
+      source,
+      status,
+      created_at,
+      updated_at
+    ) VALUES ($1, $2, $3, $4, 'open', COALESCE($5, NOW()), COALESCE($6, NOW()))
+    ON CONFLICT (id) DO UPDATE
+      SET title = EXCLUDED.title,
+          description = EXCLUDED.description,
+          source = EXCLUDED.source,
+          updated_at = EXCLUDED.updated_at`,
+    [
+      issueId,
+      issue.title || '',
+      issue.description || issue.body || '',
+      issue.source || null,
+      issue.createdAt || null,
+      issue.updatedAt || null,
+    ]
+  );
+}
