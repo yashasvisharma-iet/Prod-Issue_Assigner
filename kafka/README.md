@@ -70,3 +70,33 @@ node kafka/workers/issueProcessor.js
 - Message format is versioned (`schemaVersion`) for future compatibility.
 
 ## My Notes
+
+## Assignment engine integration
+
+The worker now invokes a hybrid scoring assignment engine after consuming `issue.created` events.
+
+### Required runtime config
+
+```bash
+DATABASE_URL=postgres://user:password@localhost:5432/prod_issue_assigner
+npm install pg
+```
+
+### Assignment method
+
+The engine follows a hybrid scoring flow:
+
+1. Parse issue content (`title`, `description`, `labels`) into keywords/features.
+2. Score each available developer using weighted factors:
+   - skill match (soft/partial match)
+   - weighted current load
+   - availability status
+3. Select best candidate.
+4. If scores tie, pick using round-robin based on oldest recent assignment.
+5. Atomically persist assignment in a DB transaction:
+   - lock issue row
+   - set `issues.assigned_to`
+   - insert into `assignments`
+   - increment `developers.current_load`
+
+If `DATABASE_URL` is missing or `pg` is not installed, worker logs a warning and safely skips assignment.
