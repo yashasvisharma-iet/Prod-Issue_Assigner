@@ -1,11 +1,13 @@
 const { runConsumer } = require('../consumer');
 const { TOPICS, ensureTopics } = require('../topics');
 const { buildEngineFromPgClient } = require('../../assignment');
+const { EmailNotifier } = require('../../notifications/emailNotifier');
 
 const groupId = process.env.KAFKA_CONSUMER_GROUP || 'issue-assignment-workers';
 
 let cachedEngine = null;
 let cachedPgClient = null;
+let cachedNotifier = null;
 
 async function getAssignmentEngine() {
   if (cachedEngine) {
@@ -36,6 +38,15 @@ async function getAssignmentEngine() {
   return cachedEngine;
 }
 
+
+function getEmailNotifier() {
+  if (!cachedNotifier) {
+    cachedNotifier = new EmailNotifier({ logger: console });
+  }
+
+  return cachedNotifier;
+}
+
 async function handleIssueCreatedEvent(message) {
   const issueEvent = message.payload;
 
@@ -63,11 +74,18 @@ async function handleIssueCreatedEvent(message) {
   await upsertIssueFromEvent(issue);
   const result = await engine.assignIssue(issue, { method: 'rule' });
 
+  const notification = await sendAssignmentNotification({
+    assigned: result.assigned,
+    issue,
+    candidate: result.candidate,
+  });
+
   console.log('Issue assignment processed', {
     issueId: issue?.issueId,
     assigned: result.assigned,
     reason: result.reason || null,
     developerId: result.assignment?.developer_id || result.assignment?.developerId || null,
+    notification,
     offset: message.offset,
   });
 }
@@ -126,4 +144,35 @@ async function upsertIssueFromEvent(issue = {}) {
       issue.updatedAt || null,
     ]
   );
+}
+
+
+async function sendAssignmentNotification({ assigned, issue, candidate }) {
+  if (!assigned) {
+    return {
+      sent: false,
+      reason: 'not_assigned',
+    };
+  }
+
+  const notifier = getEmailNotifier();
+
+  try {
+    return await notifier.sendIssueAssigned({
+      issue,
+      developer: candidate?.developer,
+    });
+  } catch (error) {
+    console.error('Failed to send assignment email notification', {
+      issueId: issue?.issueId || issue?.id || null,
+      developerId: candidate?.developer?.id || null,
+      error: error.message,
+    });
+
+    return {
+      sent: false,
+      reason: 'send_failed',
+      error: error.message,
+    };
+  }
 }

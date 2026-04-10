@@ -100,3 +100,43 @@ The engine follows a hybrid scoring flow:
    - increment `developers.current_load`
 
 If `DATABASE_URL` is missing or `pg` is not installed, worker logs a warning and safely skips assignment.
+
+## Phase 5.2: Email Notification System
+
+After an issue is assigned by `kafka/workers/issueProcessor.js`, the worker now attempts to send an email notification to the assigned developer.
+
+### Notification message
+
+The email includes:
+
+- 🚀 New Issue Assigned
+- Issue: `#<issueId>`
+- Title: `<issue title>`
+- Assigned to: `<developer name>`
+
+### Runtime setup
+
+1. Install dependency:
+
+   ```bash
+   npm install nodemailer
+   ```
+
+2. Configure SMTP environment variables:
+
+   ```bash
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USER=alerts@example.com
+   SMTP_PASS=app-password-or-smtp-password
+   SMTP_SECURE=false
+   EMAIL_FROM="Prod Issue Assigner <alerts@example.com>"
+   ```
+
+3. Ensure developer records have valid emails in the `developers.email` column.
+
+### Behavior and fallback
+
+- If SMTP config is missing, email notifications are disabled and assignment still succeeds.
+- If the assigned developer has no email, worker logs a skipped notification.
+- If email sending fails, assignment remains committed; only notification is marked failed in logs.
