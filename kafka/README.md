@@ -28,7 +28,6 @@ parallel/
 ## Install dependency
 
 From repository root:
-
 ```bash
 npm install kafkajs
 ```

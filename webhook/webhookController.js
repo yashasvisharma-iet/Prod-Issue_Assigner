@@ -4,12 +4,9 @@ const { WebhookParser } = require("./webhookParser");
 const { WebhookService } = require("./webhookService");
 const { WebhookIdempotencyStore } = require("./webhookIdempotency");
 
-function createWebhookController({
-  parser = new WebhookParser(),
-  service = new WebhookService(),
-  idempotencyStore = new WebhookIdempotencyStore(),
-  logger = console,
-} = {}) {
+function createWebhookController(deps = {}) {
+  const resolvedDeps = resolveControllerDependencies(deps);
+  const serviceInstance = resolvedDeps.service || new WebhookService({ IssueEventPublisher: performEventPublishing(resolvedDeps.logger) });
   return async function handleWebhookIssues(req, res) {
     if (req.method !== "POST") {
       return res.status(405).json({ error: "Method not allowed" });
@@ -20,15 +17,47 @@ function createWebhookController({
     const issueEvent = parseEvent(context, parser, logger, res);
     if (!issueEvent) return;
 
-    if (!isSignatureValid(issueEvent, context, service, res)) return;
+    if (!isSignatureValid(issueEvent, context, serviceInstance, res)) return;
 
     const key = generateIdempotencyKey(issueEvent);
     if (isDuplicate(key, idempotencyStore, res)) return;
 
-    const job = enqueueEvent(issueEvent, service);
+    const job = await enqueueEvent(issueEvent, serviceInstance);
     return sendAcceptedResponse(res, job, issueEvent);
   };
 }
+
+function resolveControllerDependencies({  service, parser, idempotencyStore, logger } = {}) {
+  return {
+    service: resolveService(service, logger),
+    parser: parser || new WebhookParser(),
+    idempotencyStore: idempotencyStore || new WebhookIdempotencyStore(),
+    logger: logger || console,
+  };
+}
+
+function resolveService(service, logger) {
+  if (service) return service;
+
+  return createWebhookService(logger);
+}
+
+function createWebhookService(logger) {
+  return new WebhookService({
+    IssueEventPublisher: resolveIssueEventPublisher(logger),
+  });
+}
+
+function resolveIssueEventPublisher(logger) {
+  try {
+    const { publishIssueCreated } = require("../kafka/producer");
+    return publishIssueCreated;
+  } catch (error) {
+    logPublisherUnavailable(logger, error);
+    return async function noopPublisher() {};
+  }
+}
+
 
 
 function buildRequestContext(req) {
@@ -41,7 +70,7 @@ function buildRequestContext(req) {
 
 function parseEvent(context, parser, logger, res) {
   try {
-    return parser.parse(context.headers, context.payload);
+    return parser.parseGithub(context.headers, context.payload);
   } catch (error) {
     logger.warn("Invalid webhook payload", { error: error.message });
     res.status(400).json({ error: error.message });
@@ -103,6 +132,12 @@ function normalizeHeaders(headers = {}) {
   }
 
   return normalized;
+}
+
+function logPublisherUnavailable(logger, error) {
+  logger.warn("Kafka publisher unavailable; proceeding without Kafka enqueue", {
+    error: error.message,
+  });
 }
 
 module.exports = {

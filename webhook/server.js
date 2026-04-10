@@ -33,6 +33,10 @@ function startWebhookServer({
     if (body === null) {
       return res.status(400).json({ error: "Invalid JSON body" });
     }
+    const deliveryId = req.headers["x-github-delivery"];
+    logger.info("Webhook received", {
+      deliveryId,
+    });
 
     const adaptedReq = {
       method: req.method,
@@ -43,6 +47,16 @@ function startWebhookServer({
 
     try {
       await controller(adaptedReq, res);
+      logger.info("Webhook processed successfully", {
+        action: body?.action,
+        sender: body?.sender?.login,
+        issue: {
+            id: body?.issue?.id,
+            number: body?.issue?.number,
+            title: body?.issue?.title,
+        },
+        statusCode: res.statusCode,
+        });
     } catch (error) {
       logger.error("Unhandled webhook handler error", { error: error.message });
       return res.status(500).json({ error: "Internal server error" });

@@ -7,9 +7,11 @@ class WebhookService {
   constructor({
     githubWebhookSecret = process.env.GITHUB_WEBHOOK_SECRET,
     queueConsumer,
+    IssueEventPublisher,
   } = {}) {
     this.githubWebhookSecret = githubWebhookSecret;
     this.queueConsumer = queueConsumer;
+    this.IssueEventPublisher = IssueEventPublisher;
     this.queue = [];
   }
 
@@ -35,7 +37,7 @@ class WebhookService {
     return this.safeCompare(signature, digest);
   }
 
-  enqueue(issueEvent) {
+  async enqueue(issueEvent) {
     const job = new AssignmentJob({
       id: crypto.randomUUID(),
       receivedAt: new Date().toISOString(),
@@ -43,6 +45,7 @@ class WebhookService {
     });
 
     this.queue.push(job);
+    await this.publishIssueEvent(issueEvent);
 
     if (this.queueConsumer) {
       Promise.resolve(this.queueConsumer(job)).catch(() => {
@@ -63,6 +66,26 @@ class WebhookService {
 
     return crypto.timingSafeEqual(aBuf, bBuf);
   }
+  async publishIssueEvent(issueEvent) {
+    const payload = this.buildEventPayload(issueEvent);
+    await this.IssueEventPublisher(payload);
+  }
+
+  buildEventPayload(issueEvent) {
+    return {
+      issueId: issueEvent.issueId,
+      source: issueEvent.source,
+      title: issueEvent.title,
+      description: issueEvent.body,
+      labels: issueEvent.labels,
+      assignee: issueEvent.assignee,
+      reporter: issueEvent.reporter,
+      createdAt: issueEvent.createdAt,
+      updatedAt: issueEvent.updatedAt,
+    };
+  }
+
+
 }
 
 module.exports = {
