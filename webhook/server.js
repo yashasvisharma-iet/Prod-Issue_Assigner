@@ -3,17 +3,6 @@
 const express = require("express");
 const { createWebhookController } = require("./webhookController");
 
-function parseJsonBody(body) {
-  if (!body) {
-    return {};
-  }
-
-  try {
-    return JSON.parse(body);
-  } catch {
-    return null;
-  }
-}
 
 function startWebhookServer({
   port = Number(process.env.PORT || 3000),
@@ -38,7 +27,7 @@ function startWebhookServer({
       deliveryId,
     });
 
-    const adaptedReq = {
+    const request = {
       method: req.method,
       headers: req.headers,
       body,
@@ -46,7 +35,7 @@ function startWebhookServer({
     };
 
     try {
-      await controller(adaptedReq, res);
+      await controller(request, res);
       logger.info("Webhook processed successfully", {
         action: body?.action,
         sender: body?.sender?.login,
@@ -72,6 +61,18 @@ function startWebhookServer({
   });
 
   return server;
+}
+
+function parseJsonBody(body) {
+  if (!body) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(body);
+  } catch {
+    return null;
+  }
 }
 
 if (require.main === module) {

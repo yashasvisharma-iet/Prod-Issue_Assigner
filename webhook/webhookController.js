@@ -5,6 +5,7 @@ const { WebhookService } = require("./webhookService");
 const { WebhookIdempotencyStore } = require("./webhookIdempotency");
 
 function createWebhookController(deps = {}) {
+  //resolving deps is basically just  fetching them from service
   const resolvedDeps = resolveControllerDependencies(deps);
   const serviceInstance = resolvedDeps.service || new WebhookService({ IssueEventPublisher: performEventPublishing(resolvedDeps.logger) });
   return async function handleWebhookIssues(req, res) {
@@ -14,13 +15,13 @@ function createWebhookController(deps = {}) {
 
     const context = buildRequestContext(req);
 
-    const issueEvent = parseEvent(context, parser, logger, res);
+    const issueEvent = parseEvent(context, resolvedDeps.parser, resolvedDeps.logger, res);
     if (!issueEvent) return;
 
     if (!isSignatureValid(issueEvent, context, serviceInstance, res)) return;
 
     const key = generateIdempotencyKey(issueEvent);
-    if (isDuplicate(key, idempotencyStore, res)) return;
+    if (isDuplicate(key, resolvedDeps.idempotencyStore, res)) return;
 
     const job = await enqueueEvent(issueEvent, serviceInstance);
     return sendAcceptedResponse(res, job, issueEvent);
@@ -57,7 +58,6 @@ function resolveIssueEventPublisher(logger) {
     return async function noopPublisher() {};
   }
 }
-
 
 
 function buildRequestContext(req) {

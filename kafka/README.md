@@ -60,7 +60,7 @@ await publishIssueCreated({
 ## Run worker
 
 ```bash
-node parallel/kafka/workers/issueProcessor.js
+node kafka/workers/issueProcessor.js
 ```
 
 ## Notes
@@ -68,3 +68,5 @@ node parallel/kafka/workers/issueProcessor.js
 - Producer retries are enabled with idempotent semantics to reduce duplicate writes.
 - Consumer commits only after message handling returns successfully.
 - Message format is versioned (`schemaVersion`) for future compatibility.
+
+## My Notes

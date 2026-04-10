@@ -7,7 +7,7 @@ class WebhookService {
   constructor({
     githubWebhookSecret = process.env.GITHUB_WEBHOOK_SECRET,
     queueConsumer,
-    IssueEventPublisher,
+    IssueEventPublisher = async() => {},
   } = {}) {
     this.githubWebhookSecret = githubWebhookSecret;
     this.queueConsumer = queueConsumer;
